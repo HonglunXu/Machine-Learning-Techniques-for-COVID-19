@@ -1,5 +1,5 @@
 ####################################################################################################
-# Copyright (C) 2023 Honglun Xu and Anum, Andrews T                                                             #
+# Copyright (C) 2023 Honglun Xu and Andrews T. Anum                                                             #
 # All Methods For Reduced Data                                                                                                 #
 # Utilizing Machine Learning Techniques for COVID-19 Screening Based on Clinical Data                           #                                                                                              #
 ####################################################################################################
