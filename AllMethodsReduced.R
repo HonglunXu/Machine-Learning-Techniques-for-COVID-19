@@ -1,29 +1,32 @@
+####################################################################################################
+# Copyright (C) 2023 Honglun Xu                                                              #
+# All Methods For Reduced Data                                                                                                 #
+# Utilizing Machine Learning Techniques for COVID-19 Screening Based on Clinical Data                           #                                                                                              #
+####################################################################################################
+
+
+## ！！！
+# Set working directory
 rm(list = ls())
 getwd()
-setwd("/Users/hxu3/Desktop/RIMES/UTMB/COVID.diagnosis.train.imp.cart.df.csv~1/")
-#list.files()
+setwd(path) # Replace with actual directory path!
 
+## Data Preprocessing
+## Split data into training and test
 FILE.TRAIN <- "train.reduced.data.1.csv"
 FILE.TEST  <- "test.reduced.data.1.csv"
 
 training <- read.csv(file = FILE.TRAIN, header = T, sep = ",")
 testing  <- read.csv(file = FILE.TEST, header = T,  sep = ",")
 
-
 training <- training[ ,-1]
 testing <-  testing[ , -1]
-
-dim(testing)
-dim(training)
 
 anyNA(training)
 anyNA(testing)
 
 table(training$PCR)
-
 table(testing$PCR)
-
-
 
 training$PCR = factor(training$PCR, levels = c(0L, 1L), labels = c("NotDetected", "Positive"))
 testing$PCR  = factor(testing$PCR,  levels = c(0L, 1L), labels = c("NotDetected", "Positive"))
@@ -34,7 +37,6 @@ testing$ETHNICITY  = factor(testing$ETHNICITY,  levels = c(0L, 1L), labels = c("
 
 training$I10 = factor(training$I10 , levels = c(0L, 1L), labels = c("FALSE", "TRUE"))
 testing$I10  = factor(testing$I10 ,  levels = c(0L, 1L), labels = c("FALSE", "TRUE"))
-
 
 dat.test.label <- ifelse(testing$PCR == "Positive",1,0)
 
@@ -87,6 +89,92 @@ abline(v = 0.2, col="red",lwd=2)
 text(x=0.7, y=0.2, paste("Area under ROC =", round(a.ROC, digits=4), 
                          sep=" "), col="blue", cex=1)
 
+# ======================================
+# FITTING THE FULL LOGISTIC MODEL 
+# =======================================
+
+fit.full <- glm(PCR ~ ., family="binomial", data=dat.train)
+summary(fit.full)
+names(summary(fit.full))
+BIC(fit.full)
+
+
+pred <- predict(fit.full, newdata=dat.test, type="response", se.fit=TRUE)
+yhat <- pred$fit
+write.csv(yhat,'Logistic_Regression_Y_predict_full.csv')
+
+a<-(yhat>=0.5)+0
+confusionMatrix(factor(as.numeric(as.character(a))), factor(as.numeric(as.character(dat.test.label))))
+
+(a.ROClg <- roc.area(obs = dat.test.label, pred = yhat)$A)
+mod.lg <- verify(obs=dat.test.label, pred = yhat)
+lgroc <- roc.plot(mod.lg, plot.thres = NULL,main ="ROC Curve from Logistic Regression")
+text(x=0.7, y=0.2, paste("Area under ROC =", round(a.ROClg, digits=4), 
+                         sep=" "), col="blue", cex=1)
+
+# ####################################################
+# CART
+# ####################################################
+
+library(rpart)
+control0 <- rpart.control(minsplit=10, minbucket=3, maxdepth=15,
+                          cp=0, maxcompete=4, 
+                          maxsurrogate=5, usesurrogate=2, surrogatestyle=0,  		# SURROGATE SPLITS FOR MISSING DATA
+                          xval=10)									# SET THE VALUE V FOR V-FOLD CROSS VALIDATION
+tre0 <- rpart(PCR ~ ., data=dat.train, method='class', control=control0,
+              parms=list(split='information'))
+plot(tre0)
+plotcp(tre0)
+dev.print(postscript, 'spam-fig1.ps', paper='special', height=6, width=10)
+printcp(tre0)
+
+btre <- prune(tre0, cp=.0028)
+plot(btre, uniform=T, compress=T, margin=.05)
+text(btre, use.n=T)
+dev.print(postscript, 'spam-fig2.ps', paper='special', height=8.5, width=11)
+print(btre, cp=.05)
+
+# TEST ERROR
+btre.test.class <- predict(btre, type='class', newdata=dat.test)
+btre.test.class.prob <- predict(btre, newdata=dat.test,type = "prob")
+
+confusionMatrix(dat.test$PCR, btre.test.class, positive = "Positive")
+
+
+(a.ROCcart <- roc.area(obs = dat.test.label, pred = btre.test.class.prob[,2])$A)
+mod.cart <- verify(obs=dat.test.label, pred = btre.test.class.prob[,2])
+cartroc <- roc.plot(mod.cart, plot.thres = NULL,main ="ROC Curve from CART")
+text(x=0.7, y=0.2, paste("Area under ROC =", round(a.ROCcart, digits=4), 
+                         sep=" "), col="blue", cex=1)
+
+
+# ####################################################
+# ANN
+# ####################################################
+
+library(neuralnet) 
+
+# TRAIN ANN MLP
+options(digits=3)
+net1 <- neuralnet(PCR ~ ., data=train, hidden=3, rep=5, 
+                  act.fct='logistic', err.fct="ce", linear.output=F, likelihood=TRUE)
+
+net2 <- neuralnet(PCR ~ ., data=train, hidden=c(1,1), rep = 60,
+                  threshold = 0.05, stepmax = 1e+05, learningrate = 1e-10,
+                  algorithm = "backprop", err.fct = "sse", act.fct = "tanh", 
+                  linear.output=FALSE)
+
+ypred <- compute(net1, covariate=test[,-48], rep=5)$net.result
+yobs <- test$PCR
+
+ypred.binary <- (ypred.fit1>=0.5)+0
+confusionMatrix(factor(ypred.binary), factor(yobs))
+
+(a.ROCann <- roc.area(obs = dat.test.label, pred = ypred.fit1)$A)
+mod.ann <- verify(obs=dat.test.label, pred = ypred.fit1)
+annroc <- roc.plot(mod.ann, plot.thres = NULL,main ="ROC Curve from ANN")
+text(x=0.7, y=0.2, paste("Area under ROC =", round(a.ROCann, digits=4), 
+                         sep=" "), col="blue", cex=1)
 
 ##############################B A G G I N G ###################################
 #############################REDUCED DATA. STANDARDIZED########################
@@ -111,7 +199,7 @@ bag.predn.prob <- predict(bag.modeln, finaltesting, type = "prob")
 confusionMatrix(finaltesting$PCR,  bag.predn, positive = "Positive", mode = "everything")
 
 # ===========================
-# ROC CURVE AND AUC VALUE
+# ROC CURVE AND AUC VALUE for Bagging model
 # ===========================
 
 (a.ROCbag <- roc.area(obs = dat.test.label, pred = bag.predn.prob[,2])$A)
@@ -121,43 +209,10 @@ abline(v = 0.2, col="red",lwd=2)
 text(x=0.7, y=0.2, paste("Area under ROC =", round(a.ROCbag, digits=4), 
                          sep=" "), col="blue", cex=1)
 
-baglmdat <- data.frame(bagroc$plot.data)
-fitbag <- locpoly(baglmdat$X3, baglmdat$X2, bandwidth = 0.05)
-plot(baglmdat$X3, baglmdat$X2, xlab = "false alarm rate", ylab = "hit rate")
-lines(fitbag)
-
-xpred <- 0.2
-R2 <- fitbag$y[which.min(abs(fitbag$x - xpred))]
 
 #####################################
 ##SUPPORT VECTOR MACHINE ############
 #####################################
-
-getwd()
-setwd("/Users/hxu3/Desktop/RIMES/UTMB/COVID.diagnosis.train.imp.cart.df.csv~1/")
-#list.files()
-
-FILE.TRAIN <- "train.reduced.data.csv"
-FILE.TEST  <- "test.reduced.data.csv"
-
-training <- read.csv(file = FILE.TRAIN, header = T, sep = ",")
-testing  <- read.csv(file = FILE.TEST, header = T,  sep = ",")
-
-training <- training[ ,-1]
-testing <-  testing[ , -1]
-
-training$PCR = factor(training$PCR, levels = c(0L, 1L), labels = c("NotDetected", "Positive"))
-testing$PCR  = factor(testing$PCR,  levels = c(0L, 1L), labels = c("NotDetected", "Positive"))
-
-training$ETHNICITY = factor(training$ETHNICITY, levels = c(0L, 1L), labels = c("NOTHISPANIC", "HISPANIC"))
-testing$ETHNICITY  = factor(testing$ETHNICITY,  levels = c(0L, 1L), labels = c("NOTHISPANIC", "HISPANIC"))
-
-
-training$I10 = factor(training$I10 , levels = c(0L, 1L), labels = c("FALSE", "TRUE"))
-testing$I10  = factor(testing$I10 ,  levels = c(0L, 1L), labels = c("FALSE", "TRUE"))
-
-dat.test.label <- ifelse(testing$PCR == "Positive",1,0)
-
 library(caret)
 library(kernlab)
 library(verification)
@@ -197,7 +252,7 @@ test_pred_grid <- predict(svm_Linear_Grid, newdata = testing)
 confusionMatrix(test_pred_grid, testing$PCR )
 
 
-# OBTAIN ROC CURVE AND AUC FOR SVM
+# OBTAIN ROC CURVE AND AUC FOR SVM with LINEAR
 trctr2 <- trainControl(method="repeatedcv", number = 5, repeats = 3,
                        classProbs=TRUE, savePredictions = TRUE,
                        summaryFunction = twoClassSummary)
@@ -215,16 +270,6 @@ svml_roc <- roc.plot(mod.lin, plot.thres = NULL,main ="ROC Curve from SVM LINEAR
 abline(v = 0.2, col="red",lwd=2)
 text(x=0.7, y=0.2, paste("Area under ROC =", round(linear.ROC, digits=4), 
                          sep=" "), col="blue", cex=1)
-
-
-library(KernSmooth)
-mod.lindat <- data.frame(svml_roc$plot.data)
-fitlinsvm <- locpoly(mod.lindat$X3, mod.lindat$X2, bandwidth = 0.05)
-plot(mod.lindat$X3, mod.lindat$X2, xlab = "false alarm rate", ylab = "hit rate")
-lines(fitlinsvm)
-
-xpred <- 0.2
-R3 <- fitlinsvm$y[which.min(abs(fitlinsvm$x - xpred))]
 
 # SVM II: RBF
 # ---------------------------
@@ -258,7 +303,7 @@ plot(svm_Radial_Grid)
 test_pred_Radial_Grid <- predict(svm_Radial_Grid, newdata = testing)
 confusionMatrix(test_pred_Radial_Grid, testing$PCR)
 
-# OBTAIN ROC CURVE AND AUC FOR SVM
+# OBTAIN ROC CURVE AND AUC FOR SVM with RBF
 trctr2 <- trainControl(method="repeatedcv", number = 5, repeats = 3,
                        classProbs=TRUE, savePredictions = TRUE,
                        summaryFunction = twoClassSummary)
@@ -276,14 +321,6 @@ svmrad_roc <- roc.plot(mod.rbf, plot.thres = NULL,main ="ROC Curve from SVM RADI
 abline(v = 0.2, col="red",lwd=2)
 text(x=0.7, y=0.2, paste("Area under ROC =", round(rbf.ROC, digits=4), 
                          sep=" "), col="blue", cex=1)
-
-mod.rbfdat <- data.frame(svmrad_roc$plot.data)
-fitrbfsvm <- locpoly(mod.rbfdat$X3, mod.rbfdat$X2, bandwidth = 0.05)
-plot(mod.rbfdat$X3, mod.rbfdat$X2, xlab = "false alarm rate", ylab = "hit rate")
-lines(fitrbfsvm)
-
-xpred <- 0.2
-R4 <- fitrbfsvm$y[which.min(abs(fitrbfsvm$x - xpred))]
 
 # SVM III: POLYNOMIAL KERNEL
 # ---------------------------
@@ -320,7 +357,7 @@ test_pred_grid <- predict(svm_Poly_Grid, newdata = testing)
 confusionMatrix(test_pred_grid, testing$PCR )
 
 
-# OBTAIN ROC CURVE AND AUC FOR SVM
+# OBTAIN ROC CURVE AND AUC FOR SVM with POLYNOMIAL KERNEL
 trctr2 <- trainControl(method="repeatedcv", number = 5, repeats = 3,
                        classProbs=TRUE, savePredictions = TRUE,
                        summaryFunction = twoClassSummary)
@@ -339,13 +376,5 @@ abline(v = 0.2, col="red",lwd=2)
 text(x=0.7, y=0.2, paste("Area under ROC =", round(poly.ROC, digits=4), 
                          sep=" "), col="blue", cex=1)
 
-mod.polydat <- data.frame(svmpoly_roc$plot.data)
-fitpolysvm <- locpoly(mod.polydat$X3, mod.polydat$X2, bandwidth = 0.05)
-plot(mod.polydat$X3, mod.polydat$X2, xlab = "false alarm rate", ylab = "hit rate")
-lines(fitpolysvm)
 
-xpred <- 0.2
-R5 <- fitpolysvm$y[which.min(abs(fitpolysvm$x - xpred))]
-mulroc <- cbind(matrix( c(mod.rf$pred, mod.bagg$pred, mod.lin$pred, mod.rbf$pred, mod.poly$pred), nrow = nrow(testing) ) )
-allroc <- roc.plot(dat.test.label, pred =mulroc, plot.thres = FALSE, show.thres = FALSE)
 
