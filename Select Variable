@@ -1,0 +1,225 @@
+####################################################################################################
+# Copyright (C) 2023 Honglun Xu and Andrews T. Anum                                                             
+# All Methods For Reduced Data                                                                                                
+# Utilizing Machine Learning Techniques for COVID-19 Screening Based on Clinical Data                                                                                                                   
+####################################################################################################
+
+
+## ！！！
+# Set working directory
+rm(list = ls())
+getwd()
+setwd(path) # Replace with actual directory path!
+
+## Data Preprocessing
+## Split data into training and test
+
+FILE.TRAIN <- "COVID.diagnosis.train.imp.cart.df.csv"
+FILE.TEST  <- "COVID.diagnosis.test.imp.cart.df.csv"
+
+
+dat.train <- read.csv(file = FILE.TRAIN, header = T, sep = ",")
+dat.test  <- read.csv(file = FILE.TEST, header = T, sep = ",")
+
+
+dat.train <- dat.train[ ,-1]
+dat.test <-  dat.test[ , -1]
+
+dim(dat.test)
+dim(dat.train)
+
+anyNA(dat.train)
+anyNA(dat.test)
+
+table(dat.test$PCR)
+
+table(dat.train$PCR)
+
+
+top20ICDcodes <- c(which(colnames(dat.train)=="Z20.828"), which(colnames(dat.train)=="R05"), which(colnames(dat.train)=="R50.9"), 
+                   which(colnames(dat.train)=="I10"), which(colnames(dat.train)=="R07.9"), which(colnames(dat.train)=="J18.9"),
+                   which(colnames(dat.train)=="J06.9"), which(colnames(dat.train)=="R06.00"),which(colnames(dat.train)=="R09.02"), 
+                   which(colnames(dat.train)=="Z11.59"), which(colnames(dat.train)=="B34.9"), which(colnames(dat.train)=="N17.9"),
+                   which(colnames(dat.train)=="J02.9"), which(colnames(dat.train)=="R19.7"), which(colnames(dat.train)=="R07.89"),
+                   which(colnames(dat.train)=="R53.1"), which(colnames(dat.train)=="R52"), which(colnames(dat.train)=="E11.9"),
+                   which(colnames(dat.train)=="I50.9"), which(colnames(dat.train)=="R06.02"))
+
+dat.train <- dat.train[,c(1:39,top20ICDcodes)]
+dat.test  <- dat.test[ ,c(1:39,top20ICDcodes)]
+
+
+dat.train$Z20.828 <- as.factor(dat.train$Z20.828 )
+dat.train$R05 <- as.factor(dat.train$R05)
+dat.train$R50.9 <- as.factor(dat.train$R50.9)
+dat.train$I10 <- as.factor(dat.train$I10)
+dat.train$R07.9 <- as.factor(dat.train$R07.9)
+dat.train$J18.9 <- as.factor(dat.train$J18.9)
+dat.train$J06.9 <- as.factor(dat.train$J06.9)
+dat.train$R06.00 <- as.factor(dat.train$R06.00)
+dat.train$R09.02 <- as.factor(dat.train$R09.02)
+dat.train$Z11.59 <- as.factor(dat.train$Z11.59)
+dat.train$B34.9 <- as.factor(dat.train$B34.9)
+dat.train$N17.9 <- as.factor(dat.train$N17.9)
+dat.train$J02.9 <- as.factor(dat.train$J02.9)
+dat.train$R19.7 <- as.factor(dat.train$R19.7)
+dat.train$R07.89 <- as.factor(dat.train$R07.89)
+dat.train$R53.1 <- as.factor(dat.train$R53.1)
+dat.train$R52 <- as.factor(dat.train$R52)
+dat.train$E11.9 <- as.factor(dat.train$E11.9)
+dat.train$I50.9 <- as.factor(dat.train$I50.9)
+dat.train$R06.02 <- as.factor(dat.train$R06.02)
+
+
+dat.test$Z20.828 <- as.factor(dat.test$Z20.828 )
+dat.test$R05 <- as.factor(dat.test$R05)
+dat.test$R50.9 <- as.factor(dat.test$R50.9)
+dat.test$I10 <- as.factor(dat.test$I10)
+dat.test$R07.9 <- as.factor(dat.test$R07.9)
+dat.test$J18.9 <- as.factor(dat.test$J18.9)
+dat.test$J06.9 <- as.factor(dat.test$J06.9)
+dat.test$R06.00 <- as.factor(dat.test$R06.00)
+dat.test$R09.02 <- as.factor(dat.test$R09.02)
+dat.test$Z11.59 <- as.factor(dat.test$Z11.59)
+dat.test$B34.9 <- as.factor(dat.test$B34.9)
+dat.test$N17.9 <- as.factor(dat.test$N17.9)
+dat.test$J02.9 <- as.factor(dat.test$J02.9)
+dat.test$R19.7 <- as.factor(dat.test$R19.7)
+dat.test$R07.89 <- as.factor(dat.test$R07.89)
+dat.test$R53.1 <- as.factor(dat.test$R53.1)
+dat.test$R52 <- as.factor(dat.test$R52)
+dat.test$E11.9 <- as.factor(dat.test$E11.9)
+dat.test$I50.9 <- as.factor(dat.test$I50.9)
+dat.test$R06.02 <- as.factor(dat.test$R06.02)
+
+
+dim(dat.test)
+
+dim(dat.train)
+
+
+
+
+scaled.dat.train <- data.frame( apply(dat.train[,-c(1:2,4,40:59)], 2, scale, center=T, scale=T) )
+scaled.dat.test  <- data.frame( apply(dat.test[, -c(1:2,4,40:59)], 2, scale, center=T, scale=T) )
+
+dataNEW.train <- cbind.data.frame(dat.train$SEX, dat.train$ETHNICITY, scaled.dat.train, dat.train$Z20.828, dat.train$R05, dat.train$R50.9, 
+                                  dat.train$I10, dat.train$R07.9, dat.train$J18.9,dat.train$J06.9, dat.train$R06.00, dat.train$R09.02, 
+                                  dat.train$Z11.59, dat.train$B34.9, dat.train$N17.9,dat.train$J02.9, dat.train$R19.7, dat.train$R07.89, 
+                                  dat.train$R53.1, dat.train$R52, dat.train$E11.9, dat.train$I50.9, dat.train$R06.02, dat.train$PCR)
+
+colnames(dataNEW.train) <-  c(colnames(dat.test)[-4], "PCR")
+
+dataNEW.test <- cbind.data.frame(dat.test$SEX, dat.test$ETHNICITY, scaled.dat.test, dat.test$Z20.828, dat.test$R05, dat.test$R50.9, 
+                                 dat.test$I10, dat.test$R07.9, dat.test$J18.9,dat.test$J06.9, dat.test$R06.00, dat.test$R09.02, 
+                                 dat.test$Z11.59, dat.test$B34.9, dat.test$N17.9,dat.test$J02.9, dat.test$R19.7, dat.test$R07.89, 
+                                 dat.test$R53.1, dat.test$R52, dat.test$E11.9,dat.test$I50.9, dat.test$R06.02, dat.test$PCR)
+
+colnames(dataNEW.test) <- colnames(dataNEW.train)
+
+dat.train <- dataNEW.train
+dat.test <- dataNEW.test
+
+dim(dat.test)
+
+dim(dat.train)
+
+
+
+#ifelse(dat.train$ETHNICITY == "HISPANIC OR LATINO","HISPANIC", "NOTHISPANIC")
+dat.train$PCR = ifelse(dat.train$PCR == "Positive", "Positive", "NotDetected")
+dat.test$PCR  = ifelse(dat.test$PCR == "Positive", "Positive", "NotDetected")
+
+dat.train$PCR = factor(dat.train$PCR, levels =  c("NotDetected", "Positive"), labels = c("NotDetected", "Positive"))
+dat.test$PCR  = factor(dat.test$PCR,  levels =  c("NotDetected", "Positive"), labels = c("NotDetected", "Positive"))
+
+dat.test.label <- ifelse(dat.test$PCR == "Positive",1,0)
+
+
+library(verification)
+library(randomForest)
+library(caret)
+library(cvAUC)
+library(pROC)
+
+
+set.seed(1234)
+#NTREE <- sample(100:2500, 200, replace=F)
+NTREE<- seq(from = 100 ,to =2500,by=100)
+#NTREE <- c(500, 1000, 1500, 2000, 2500 )
+k.rf <- 0*c()
+for (i in 1:length(NTREE)) {
+  rf.model <- randomForest(PCR~., data = dat.train, ntree = NTREE[i], mtry = floor(sqrt(ncol(dat.train))), importance = T)
+  rf.pred  <- predict(rf.model, dat.test)
+  k.rf[i]  <- unlist(confusionMatrix(dat.test$PCR, rf.pred)$overall[1])
+}
+
+
+plot(NTREE, 1-k.rf, type="o", lwd=2, ylim=c(0.2,0.34),xlab = "Number of trees used in aggregation", 
+                  ylab = "Misclassification Rate")
+
+
+lines(NTREE, 1-k.rf-sqrt((1-k.rf)*(k.rf)/(NTREE*2/3)),lwd=2,col = "red",lty = "dashed")
+lines(NTREE, 1-k.rf+sqrt((1-k.rf)*(k.rf)/(NTREE*2/3)),lwd=2,col = "red",lty = "dashed")
+uplim <- 1-k.rf+sqrt((1-k.rf)*(k.rf)/(NTREE*2/3))
+
+location<-which.min(1-k.rf)
+location
+
+abline(h=min(1-k.rf), col="blue",lwd=2)
+
+# m = (B[2] - A[2]) / (B[1] - A[1])
+rate <- 1-k.rf-sqrt((1-k.rf)*(k.rf)/(NTREE*2/3))
+k<- (rate[location]-(rate[location-1]))/(NTREE[location]-NTREE[location-1])
+b<- rate[location]-k*NTREE[location]
+inter<- round((min(1-k.rf)-b)/k)
+inter
+segments(673,0,673, min(1-k.rf),lwd=2,col = "green",lty = "dashed")
+
+nval=673
+rf.modeln <- randomForest(PCR~., data = dat.train, ntree = nval, mtry = floor(sqrt(ncol(dat.train))), importance = T)
+randomForest::varImpPlot(rf.modeln,main="Variable Importance Plot")
+importance(rf.modeln)
+rf.modeln
+
+rf.predn  <- predict(rf.modeln, dat.test)
+rf.predn.prob  <- predict(rf.modeln, dat.test, type = "prob")
+confusionMatrix(dat.test$PCR, rf.predn, positive = "Positive")
+
+
+imp <- cbind.data.frame(Feature=rownames(importance(rf.modeln)),importance(rf.modeln))
+new.imp<-imp[order(imp$MeanDecreaseAccuracy, decreasing = TRUE), ]
+plt.imp <- head(new.imp,20)
+g <- ggplot(plt.imp, aes(y=reorder(Feature,MeanDecreaseAccuracy),x=MeanDecreaseAccuracy))
+g + geom_bar(stat = 'identity',fill = "chartreuse4") + xlab('Mean Decrease Accuracy')+ylab('Variables Name')
+
+
+
+new.imp<-imp[order(imp$MeanDecreaseAccuracy, decreasing = TRUE), ]
+dat.train.new<-subset(dat.train,select=c(new.imp$Feature))
+dat.train.new["PCR"]<-dat.train$PCR
+
+
+result <- rfcv(dat.train.new[,-59], dat.train.new[,59], cv.fold=10,ntree = nval,mtry=identity,scale = "new",step=-3)
+result$error.cv
+
+with(result, plot(n.var, error.cv, type="o", lwd=2, ylim=c(0.2,0.4),xlab = "Number of variables", 
+                  ylab = "Cross Validarion Error"))
+
+
+SD <- sqrt((1-result$error.cv)*(result$error.cv)/(nval*2/3))
+lines(result$n.var, result$error.cv-SD,lwd=2,col = "red",lty = "dashed")
+lines(result$n.var, result$error.cv+SD,lwd=2,col = "red",lty = "dashed")
+uplim <- result$error.cv+SD
+
+a <- data.frame(which.min(result$error.cv))
+b <- a$which.min.result.error.cv.
+abline(h=min(result$error.cv), col="blue",lwd=2)
+
+# m = (B[2] - A[2]) / (B[1] - A[1])
+new.result <- result$error.cv-SD
+k<- (new.result[length(result$n.var)-4]-new.result[length(result$n.var)-3])/(result$n.var[length(result$n.var)-4]-result$n.var[length(result$n.var)-3])
+bb<- new.result[length(result$n.var)-4]-k*result$n.var[length(result$n.var)-4]
+New.inter<- round((min(result$error.cv)-bb)/k)
+New.inter
+segments(13,0,13, min(result$error.cv),lwd=2,col = "green",lty = "dashed")
+
