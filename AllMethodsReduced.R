@@ -212,7 +212,7 @@ MaxIndex <- which(k.rf == max(k.rf))
 nval <- NTREE[MaxIndex[1]]
 
 set.seed(25)
-rf.model <- randomForest(PCR~., data = finaltraining, ntree =50, mtry = floor(sqrt(ncol(finaltraining))), importance = T)
+rf.model <- randomForest(PCR~., data = finaltraining, ntree =nval, mtry = floor(sqrt(ncol(finaltraining))), importance = T)
 print(rf.model)
 
 rf.pred  <- predict(rf.model, finaltesting)
